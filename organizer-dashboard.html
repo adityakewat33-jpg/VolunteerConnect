@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Organizer Dashboard | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+  <div class="nav-left">
+    <h2 class="logo">Volunteer<span>Connect</span></h2>
+  </div>
+
+  <div class="nav-right">
+    <button class="organize-toggle-btn"
+      onclick="window.location.href='organize.html'">
+      + Organize Event
+    </button>
+
+    <button class="nav-btn" onclick="window.location.href='scanner.html'">
+      Scan Pass 📷
+    </button>
+
+    <button class="logout-btn" onclick="logout()">
+      Logout
+    </button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="dashboard">
+  <div class="events-container">
+    <h3>My Events</h3>
+    <div id="eventList" class="scrollable"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, signOut, onAuthStateChanged } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, collection, query, where, onSnapshot, doc, getDoc } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+/* CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* LOGOUT */
+window.logout = async () => {
+  await signOut(auth);
+  window.location.href = "login.html";
+};
+
+/* AUTH CHECK */
+onAuthStateChanged(auth, async (user) => {
+
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  const snap = await getDoc(doc(db, "users", user.uid));
+
+  if (!snap.exists() || snap.data().role !== "organizer") {
+    alert("Access denied");
+    window.location.href = "dashboard.html";
+    return;
+  }
+
+  loadEvents(user.uid);
+});
+
+/* LOAD EVENTS */
+function loadEvents(uid) {
+
+  const eventList = document.getElementById("eventList");
+
+  const q = query(
+    collection(db, "events"),
+    where("creatorId", "==", uid)
+  );
+
+  onSnapshot(q, (snapshot) => {
+
+    eventList.innerHTML = "";
+
+    if (snapshot.empty) {
+      eventList.innerHTML = "<p>No events created yet.</p>";
+      return;
+    }
+
+    snapshot.forEach((docSnap) => {
+
+      const event = docSnap.data();
+      const eventId = docSnap.id;
+
+      eventList.innerHTML += `
+        <div class="event-card premium">
+          <img src="${event.photoUrl}" class="event-image">
+
+          <div class="event-content">
+            <h4>${event.title}</h4>
+            <p class="event-date">📅 ${event.date}</p>
+            <p>${event.description}</p>
+
+            <!-- ACTION BUTTONS -->
+            <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button onclick="window.location.href='event-details.html?eventId=${eventId}'">
+  View Details 📄
+</button>
+
+              <button onclick="window.location.href='requests.html?eventId=${eventId}'">
+                View Requests 👥
+              </button>
+            </div>
+
+          </div>
+        </div>
+      `;
+    });
+
+  });
+}
+</script>
+
+</body>
+</html>

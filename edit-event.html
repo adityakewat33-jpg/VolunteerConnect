@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Event | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="form-page">
+  <div class="form-card">
+    <h2>Edit Event</h2>
+
+    <input type="text" id="title" placeholder="Event Title">
+    <input type="text" id="location" placeholder="Location">
+    <input type="url" id="mapLink" placeholder="Google Maps Link">
+
+    <input type="number" step="any" id="lat" placeholder="Latitude">
+    <input type="number" step="any" id="lng" placeholder="Longitude">
+
+    <input type="date" id="date">
+    <textarea id="description" placeholder="Description"></textarea>
+
+    <button onclick="updateEvent()">Update Event</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, doc, getDoc, updateDoc } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+/* CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* GET EVENT ID */
+const eventId = new URLSearchParams(window.location.search).get("eventId");
+
+/* LOAD EVENT DATA */
+async function loadEvent() {
+
+  const snap = await getDoc(doc(db, "events", eventId));
+
+  if (!snap.exists()) {
+    alert("Event not found");
+    return;
+  }
+
+  const e = snap.data();
+
+  title.value = e.title || "";
+  location.value = e.location || "";
+  mapLink.value = e.mapLink || "";
+  lat.value = e.lat || "";
+  lng.value = e.lng || "";
+  date.value = e.date || "";
+  description.value = e.description || "";
+}
+
+/* UPDATE EVENT */
+window.updateEvent = async () => {
+
+  try {
+
+    await updateDoc(doc(db, "events", eventId), {
+      title: title.value,
+      location: location.value,
+      mapLink: mapLink.value,
+      lat: parseFloat(lat.value),
+      lng: parseFloat(lng.value),
+      date: date.value,
+      description: description.value
+    });
+
+    alert("Event Updated Successfully ✅");
+
+    window.location.href = "organizer-dashboard.html";
+
+  } catch (error) {
+    console.error(error);
+    alert("Error updating event ❌");
+  }
+};
+
+loadEvent();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Events | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+  <h2 class="logo">Volunteer<span>Connect</span></h2>
+
+  <div>
+    <button onclick="window.location.href='dashboard.html'">← Back</button>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="dashboard">
+  <div class="events-container">
+
+    <h3>My Joined Events ⭐</h3>
+
+    <div id="eventList"></div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, signOut, onAuthStateChanged } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  doc, 
+  getDoc 
+} from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+/* CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* AUTH */
+onAuthStateChanged(auth, (user) => {
+  if (!user) window.location.href = "index.html";
+  else loadMyEvents(user.uid);
+});
+
+/* LOGOUT */
+window.logout = async () => {
+  await signOut(auth);
+  window.location.href = "index.html";
+};
+
+/* LOAD JOINED EVENTS */
+async function loadMyEvents(userId) {
+
+  const eventList = document.getElementById("eventList");
+  eventList.innerHTML = "";
+
+  const reqSnap = await getDocs(query(
+    collection(db, "eventRequests"),
+    where("userId", "==", userId)
+  ));
+
+  for (const docSnap of reqSnap.docs) {
+
+    const req = docSnap.data();
+    const eventId = req.eventId;
+
+    const eventDoc = await getDoc(doc(db, "events", eventId));
+    const event = eventDoc.data();
+
+    let status = req.status;
+
+    let passHTML = "";
+
+    if (status === "approved") {
+
+      const passSnap = await getDocs(query(
+        collection(db, "passes"),
+        where("eventId", "==", eventId),
+        where("userId", "==", userId)
+      ));
+
+      if (!passSnap.empty) {
+        const pass = passSnap.docs[0].data();
+        passHTML = `<img src="${pass.qrCode}" width="120"/>`;
+      }
+    }
+
+    eventList.innerHTML += `
+      <div class="event-card premium">
+        <img src="${event.photoUrl}" class="event-image">
+
+        <div class="event-content">
+          <h4>${event.title}</h4>
+          <p>${event.location}</p>
+
+          <p>Status: ${status}</p>
+
+          ${passHTML}
+        </div>
+      </div>
+    `;
+  }
+}
+</script>
+
+</body>
+</html>

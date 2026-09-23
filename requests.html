@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Requests | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="dashboard">
+  <div class="events-container">
+    <h3>Volunteer Requests</h3>
+    <div id="requests">Loading...</div>
+  </div>
+</div>
+
+<!-- EMAILJS -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+  emailjs.init("k2hzGZOeJwtbfAqJ_");
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where, doc, getDoc, updateDoc, addDoc } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+/* FIREBASE CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* GET EVENT ID */
+const eventId = new URLSearchParams(window.location.search).get("eventId");
+
+/* LOAD REQUESTS */
+async function loadRequests() {
+
+  const container = document.getElementById("requests");
+  container.innerHTML = "Loading...";
+
+  try {
+
+    if (!eventId) {
+      container.innerHTML = "Invalid Event ID";
+      return;
+    }
+
+    const snap = await getDocs(query(
+      collection(db, "eventRequests"),
+      where("eventId", "==", eventId)
+    ));
+
+    if (snap.empty) {
+      container.innerHTML = "<p>No requests yet.</p>";
+      return;
+    }
+
+    container.innerHTML = "";
+
+    // ✅ FIX: use for...of instead of forEach
+    for (const docSnap of snap.docs) {
+
+      const req = docSnap.data();
+
+      // SAFE USER FETCH
+      const userDoc = await getDoc(doc(db, "users", req.userId));
+
+      let user = {
+        name: "Unknown",
+        email: "No Email",
+        phone: "-",
+        bloodGroup: "-"
+      };
+
+      if (userDoc.exists()) {
+        user = userDoc.data();
+      }
+
+      container.innerHTML += `
+        <div class="event-card premium">
+          <div class="event-content">
+
+            <h4>${user.name}</h4>
+            <p>📧 ${user.email}</p>
+            <p>📞 ${user.phone}</p>
+            <p>🩸 ${user.bloodGroup}</p>
+
+            <p>Status: <b>${req.status}</b></p>
+
+            ${
+              req.status === "pending"
+                ? `
+                  <button onclick="approve('${docSnap.id}','${req.userId}')">
+                    Approve
+                  </button>
+
+                  <button onclick="reject('${docSnap.id}')">
+                    Reject
+                  </button>
+                `
+                : `<button disabled>${req.status}</button>`
+            }
+
+          </div>
+        </div>
+      `;
+    }
+
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = "Error loading requests";
+  }
+}
+
+/* APPROVE */
+window.approve = async (reqId, userId) => {
+
+  try {
+
+    await updateDoc(doc(db, "eventRequests", reqId), {
+      status: "approved"
+    });
+
+    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${userId}_${eventId}`;
+
+    await addDoc(collection(db, "passes"), {
+      userId,
+      eventId,
+      qrCode: qr,
+      issuedAt: new Date()
+    });
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    const user = userDoc.data();
+
+    emailjs.send("service_33y2cal", "template_event_pass", {
+      name: user.name || "Volunteer",
+      to_email: user.email,
+      qr_code: qr
+    });
+
+    alert("Approved & Email Sent ✅");
+    loadRequests();
+
+  } catch (error) {
+    console.error(error);
+    alert("Error approving request");
+  }
+};
+
+/* REJECT */
+window.reject = async (reqId) => {
+
+  await updateDoc(doc(db, "eventRequests", reqId), {
+    status: "rejected"
+  });
+
+  alert("Rejected ❌");
+  loadRequests();
+};
+
+/* INIT */
+loadRequests();
+
+</script>
+
+</body>
+</html>

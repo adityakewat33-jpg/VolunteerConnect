@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Organize Event | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="navbar">
+  <h2 class="logo">Volunteer<span>Connect</span></h2>
+  <button class="logout-btn"
+    onclick="window.location.href='organizer-dashboard.html'">
+    ← Back
+  </button>
+</div>
+
+<div class="form-page">
+  <div class="form-card">
+    <h2>Create New Event</h2>
+
+    <input type="text" id="title" placeholder="Event Title">
+
+    <!-- Location Name -->
+    <input type="text" id="location" placeholder="Location Name">
+
+    <!-- Google Maps Link -->
+    <input type="url" id="mapLink" placeholder="Google Maps Link">
+
+    <!-- 🔥 LAT & LNG -->
+    <input type="number" step="any" id="lat" placeholder="Latitude (e.g. 19.2183)">
+    <input type="number" step="any" id="lng" placeholder="Longitude (e.g. 72.9781)">
+
+    <input type="date" id="date">
+
+    <!-- Image Upload -->
+    <input type="file" id="imageFile" accept="image/*">
+
+    <textarea id="description" placeholder="Event Description"></textarea>
+
+    <button onclick="addNewEvent()">Create Event</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+import { getAuth } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+window.addNewEvent = async () => {
+
+  if (!auth.currentUser) {
+    alert("You must be logged in.");
+    window.location.href = "index.html";
+    return;
+  }
+
+  const title = document.getElementById("title").value.trim();
+  const location = document.getElementById("location").value.trim();
+  const mapLink = document.getElementById("mapLink").value.trim();
+  const lat = parseFloat(document.getElementById("lat").value);
+  const lng = parseFloat(document.getElementById("lng").value);
+  const date = document.getElementById("date").value;
+  const description = document.getElementById("description").value.trim();
+  const file = document.getElementById("imageFile").files[0];
+
+  /* VALIDATION */
+  if (!title || !location || !mapLink || !date || !description || !file) {
+    alert("Please fill all fields");
+    return;
+  }
+
+  if (isNaN(lat) || isNaN(lng)) {
+    alert("Please enter valid Latitude and Longitude");
+    return;
+  }
+
+  if (lat < -90 || lat > 90) {
+    alert("Latitude must be between -90 and 90");
+    return;
+  }
+
+  if (lng < -180 || lng > 180) {
+    alert("Longitude must be between -180 and 180");
+    return;
+  }
+
+  try {
+
+    /* UPLOAD IMAGE */
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "volunteer_upload");
+
+    const cloudRes = await fetch(
+      "https://api.cloudinary.com/v1_1/dwwtmpn60/image/upload",
+      {
+        method: "POST",
+        body: formData
+      }
+    );
+
+    const cloudData = await cloudRes.json();
+
+    if (!cloudData.secure_url) {
+      throw new Error("Image upload failed");
+    }
+
+    const imageURL = cloudData.secure_url;
+
+    /* SAVE EVENT */
+    await addDoc(collection(db, "events"), {
+      title,
+      location,
+      mapLink,
+      date,
+      description,
+      photoUrl: imageURL,
+      creatorId: auth.currentUser.uid,
+
+      // 🔥 MANUAL LAT LNG
+      lat: lat,
+      lng: lng,
+
+      createdAt: serverTimestamp()
+    });
+
+    alert("Event Created Successfully!");
+    window.location.href = "organizer-dashboard.html";
+
+  } catch (error) {
+    console.error(error);
+    alert(error.message);
+  }
+};
+</script>
+
+</body>
+</html>

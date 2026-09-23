@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Event Details | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    .details-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .event-banner {
+      width: 100%;
+      max-height: 300px;
+      object-fit: cover;
+      border-radius: 16px;
+      margin-bottom: 20px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .info-box {
+      background: #f7f7f7;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    .section-title {
+      margin-top: 20px;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .volunteer-card {
+      background: #f9f9f9;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 5px 10px rgba(0,0,0,0.1);
+    }
+
+    .action-buttons {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .delete-btn {
+      background: #ff4d4d;
+    }
+
+    .delete-btn:hover {
+      background: #cc0000;
+    }
+
+    @media (max-width: 700px) {
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+</head>
+<body>
+
+<div class="dashboard">
+  <div class="events-container">
+
+    <!-- HEADER -->
+    <div class="details-header">
+      <h2 id="title">Loading...</h2>
+    </div>
+
+    <!-- IMAGE -->
+    <img id="image" class="event-banner">
+
+    <!-- EVENT INFO -->
+    <div class="info-grid">
+      <div class="info-box" id="date"></div>
+      <div class="info-box" id="location"></div>
+    </div>
+
+    <div class="info-box" id="description"></div>
+
+    <!-- VOLUNTEERS -->
+    <h3 class="section-title">Approved Volunteers ✅</h3>
+    <div id="volunteers"></div>
+
+    <!-- ACTION BUTTONS -->
+    <div class="action-buttons">
+      <button id="editBtn">Edit ✏️</button>
+      <button onclick="deleteEvent()" class="delete-btn">Delete 🗑</button>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { 
+  getFirestore, doc, getDoc, collection, query, where, getDocs, deleteDoc 
+} from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const eventId = new URLSearchParams(window.location.search).get("eventId");
+
+/* LOAD EVENT */
+async function loadEvent() {
+
+  const snap = await getDoc(doc(db, "events", eventId));
+
+  if (!snap.exists()) {
+    alert("Event not found");
+    return;
+  }
+
+  const e = snap.data();
+
+  document.getElementById("title").innerText = e.title;
+  document.getElementById("date").innerText = "📅 " + e.date;
+  document.getElementById("location").innerText = "📍 " + e.location;
+  document.getElementById("description").innerText = e.description;
+  document.getElementById("image").src = e.photoUrl;
+
+  document.getElementById("editBtn").onclick = () => {
+    window.location.href = `edit-event.html?eventId=${eventId}`;
+  };
+
+  loadVolunteers();
+}
+
+/* LOAD VOLUNTEERS */
+async function loadVolunteers() {
+
+  const container = document.getElementById("volunteers");
+
+  const snap = await getDocs(query(
+    collection(db, "eventRequests"),
+    where("eventId", "==", eventId),
+    where("status", "==", "approved")
+  ));
+
+  if (snap.empty) {
+    container.innerHTML = "<p>No approved volunteers</p>";
+    return;
+  }
+
+  container.innerHTML = "";
+
+  for (const docSnap of snap.docs) {
+
+    const req = docSnap.data();
+
+    const userDoc = await getDoc(doc(db, "users", req.userId));
+    const user = userDoc.exists() ? userDoc.data() : {};
+
+    container.innerHTML += `
+      <div class="volunteer-card">
+        <strong>${user.name || "No Name"}</strong>
+        <p>📧 ${user.email}</p>
+        <p>📞 ${user.phone || "-"}</p>
+        <p>🩸 ${user.bloodGroup || "-"}</p>
+      </div>
+    `;
+  }
+}
+
+/* DELETE */
+window.deleteEvent = async () => {
+
+  const confirmDelete = confirm("Delete this event?");
+
+  if (!confirmDelete) return;
+
+  await deleteDoc(doc(db, "events", eventId));
+
+  alert("Event Deleted ❌");
+
+  window.location.href = "organizer-dashboard.html";
+};
+
+loadEvent();
+</script>
+
+</body>
+</html>

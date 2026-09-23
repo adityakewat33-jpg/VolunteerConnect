@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="navbar">
+  <h2 class="logo">Volunteer<span>Connect</span></h2>
+
+  <div class="nav-right">
+    <button class="nav-btn" onclick="window.location.href='my-events.html'">
+      My Events
+    </button>
+
+    <!-- 🔥 NEW BUTTON -->
+    <button class="nav-btn" onclick="window.location.href='profile.html'">
+      Profile 👤
+    </button>
+
+    <!-- ✅ NEARBY BUTTON -->
+    <button class="nav-btn" onclick="showNearby()">
+      Nearby 📍
+    </button>
+    <button class="nav-btn" onclick="showAll()">
+  All Events
+    </button>
+
+  <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<div class="dashboard">
+  <div class="events-container">
+
+    <h3>Events</h3>
+
+    <input 
+      type="text" 
+      id="searchInput" 
+      placeholder="Search events..."
+      oninput="loadEvents()"
+    >
+
+    <div id="eventList"></div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, signOut, onAuthStateChanged } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+
+import { 
+  getFirestore, 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  query, 
+  where, 
+  getDocs 
+} from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* ✅ GLOBALS FOR NEARBY */
+let mode = "all";
+let userLat = null;
+let userLng = null;
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) window.location.href = "index.html";
+  else loadEvents();
+});
+
+window.logout = async () => {
+  await signOut(auth);
+  window.location.href = "login.html";
+};
+
+/* ✅ NEARBY BUTTON FUNCTION */
+window.showNearby = () => {
+  mode = "nearby";
+
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      loadEvents();
+    },
+    () => {
+      alert("Please allow location access");
+    }
+  );
+};
+window.showAll = () => {
+  mode = "all";
+  loadEvents();
+};
+
+/* ✅ DISTANCE FUNCTION */
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat/2)**2 +
+    Math.cos(lat1 * Math.PI/180) *
+    Math.cos(lat2 * Math.PI/180) *
+    Math.sin(dLon/2)**2;
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+/* REQUEST JOIN */
+window.joinEvent = async (eventId) => {
+
+  const userId = auth.currentUser.uid;
+
+  const snap = await getDocs(query(
+    collection(db, "eventRequests"),
+    where("eventId", "==", eventId),
+    where("userId", "==", userId)
+  ));
+
+  if (!snap.empty) {
+    alert("Already requested");
+    return;
+  }
+
+  await addDoc(collection(db, "eventRequests"), {
+    eventId,
+    userId,
+    status: "pending",
+    createdAt: new Date()
+  });
+
+  alert("Request sent!");
+};
+
+/* LOAD EVENTS */
+function loadEvents() {
+
+  const searchText = document.getElementById("searchInput").value.toLowerCase();
+  const eventList = document.getElementById("eventList");
+
+  onSnapshot(collection(db, "events"), async (snapshot) => {
+
+    eventList.innerHTML = "";
+
+    for (const docSnap of snapshot.docs) {
+
+      const event = docSnap.data();
+      const eventId = docSnap.id;
+
+      // 🔍 SEARCH FILTER
+      if (
+        searchText &&
+        !event.title.toLowerCase().includes(searchText) &&
+        !event.location.toLowerCase().includes(searchText)
+      ) continue;
+
+      /* ✅ NEARBY FILTER (ADDED) */
+      let distanceText = "";
+
+      if (mode === "nearby") {
+
+        if (event.lat && event.lng && userLat && userLng) {
+
+          const distance = getDistance(
+            userLat,
+            userLng,
+            parseFloat(event.lat),
+            parseFloat(event.lng)
+          );
+
+          if (distance > 20) continue;
+
+          distanceText = `📍 ${distance.toFixed(2)} km away`;
+
+        } else {
+          continue;
+        }
+      }
+      
+
+      // 🔁 CHECK STATUS
+      const reqSnap = await getDocs(query(
+        collection(db, "eventRequests"),
+        where("eventId", "==", eventId),
+        where("userId", "==", auth.currentUser.uid)
+      ));
+
+      let status = null;
+
+      reqSnap.forEach(doc => {
+        status = doc.data().status;
+      });
+
+      let buttonHTML = "";
+
+      if (status === "approved") {
+        buttonHTML = `<button disabled>Approved ✅</button>`;
+      } 
+      else if (status === "pending") {
+        buttonHTML = `<button disabled>Pending ⏳</button>`;
+      } 
+      else if (status === "rejected") {
+        buttonHTML = `<button onclick="joinEvent('${eventId}')">Re-Apply</button>`;
+      } 
+      else {
+        buttonHTML = `<button onclick="joinEvent('${eventId}')">Request Join</button>`;
+      }
+
+      eventList.innerHTML += `
+        <div class="event-card premium">
+          <img src="${event.photoUrl}" class="event-image">
+
+          <div class="event-content">
+            <h4>${event.title}</h4>
+            <p>📅 ${event.date}</p>
+            <p>
+  <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}" 
+     target="_blank">
+     📍 ${event.location}
+  </a>
+</p>
+<p>${event.description || "No description available"}</p>
+  
+            <p>${distanceText}</p>
+
+            ${buttonHTML}
+          </div>
+        </div>
+      `;
+    }
+
+  });
+}
+</script>
+
+</body>
+</html>

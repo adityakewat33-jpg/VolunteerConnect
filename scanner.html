@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>QR Scanner | VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+<div class="dashboard">
+  <div class="events-container">
+
+    <h2>Scan Event Pass 📷</h2>
+
+    <div id="reader" style="width:300px;"></div>
+
+    <h3 id="result">Scan a QR Code...</h3>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+/* FIREBASE CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* QR SUCCESS */
+async function onScanSuccess(decodedText) {
+
+  document.getElementById("result").innerHTML = "Checking...";
+
+  try {
+
+    // Split QR
+    const [userId, eventId] = decodedText.split("_");
+
+    // Check pass
+    const snap = await getDocs(query(
+      collection(db, "passes"),
+      where("userId", "==", userId),
+      where("eventId", "==", eventId)
+    ));
+
+    if (!snap.empty) {
+      document.getElementById("result").innerHTML = "✅ VALID PASS";
+      document.getElementById("result").style.color = "green";
+    } else {
+      document.getElementById("result").innerHTML = "❌ INVALID PASS";
+      document.getElementById("result").style.color = "red";
+    }
+
+  } catch (error) {
+    console.error(error);
+    document.getElementById("result").innerHTML = "Error scanning";
+  }
+}
+
+/* START SCANNER */
+const scanner = new Html5QrcodeScanner(
+  "reader",
+  { fps: 10, qrbox: 250 }
+);
+
+scanner.render(onScanSuccess);
+</script>
+
+</body>
+</html>
