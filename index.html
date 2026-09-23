@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>VolunteerConnect</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="auth-container">
+  <div class="auth-card">
+
+    <div class="brand">
+      <h1 class="brand-title">Volunteer<span>Connect</span></h1>
+      <p class="brand-tagline">Empowering Communities Through Service</p>
+    </div>
+
+    <!-- ROLE TOGGLE -->
+    <div class="role-toggle">
+      <button id="volBtn" class="active" onclick="selectRole('volunteer')">
+        Volunteer
+      </button>
+      <button id="orgBtn" onclick="selectRole('organizer')">
+        Organizer
+      </button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="loginForm">
+      <h3>Login</h3>
+      <input type="email" id="loginEmail" placeholder="Email">
+      <input type="password" id="loginPassword" placeholder="Password">
+      <button onclick="login()">Login</button>
+
+      <p class="toggle-text">
+        New User?
+        <span onclick="showRegister()">Register Here</span>
+      </p>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="registerForm" style="display:none;">
+      <h3>Create Account</h3>
+      <input type="email" id="registerEmail" placeholder="Email">
+      <input type="password" id="registerPassword" placeholder="Password">
+      <button onclick="register()">Register</button>
+
+      <p class="toggle-text">
+        Already have an account?
+        <span onclick="showLogin()">Login Here</span>
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc } 
+from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+/* ✅ SAME CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyD83CLOYhpKG7OE9Ukf8s60q8IJHQaxdJA",
+  authDomain: "volunteerconnect-58acf.firebaseapp.com",
+  projectId: "volunteerconnect-58acf",
+  storageBucket: "volunteerconnect-58acf.firebasestorage.app",
+  messagingSenderId: "298160451417",
+  appId: "1:298160451417:web:e391244431246b63f32648"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let selectedRole = "volunteer";
+
+/* ROLE SELECT */
+window.selectRole = (role) => {
+  selectedRole = role.toLowerCase().trim();
+
+  document.getElementById("volBtn").classList.remove("active");
+  document.getElementById("orgBtn").classList.remove("active");
+
+  if (role === "volunteer") {
+    document.getElementById("volBtn").classList.add("active");
+  } else {
+    document.getElementById("orgBtn").classList.add("active");
+  }
+};
+
+/* TOGGLE */
+window.showRegister = () => {
+  loginForm.style.display = "none";
+  registerForm.style.display = "block";
+};
+
+window.showLogin = () => {
+  registerForm.style.display = "none";
+  loginForm.style.display = "block";
+};
+
+/* REGISTER */
+window.register = async () => {
+  const email = registerEmail.value.trim();
+  const password = registerPassword.value.trim();
+
+  if (!email || !password) {
+    alert("Fill all fields");
+    return;
+  }
+
+  try {
+    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+
+    await setDoc(doc(db, "users", userCred.user.uid), {
+      email,
+      role: selectedRole
+    });
+
+    alert("Registered as " + selectedRole);
+    showLogin();
+
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+/* LOGIN */
+window.login = async () => {
+
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value.trim();
+
+  try {
+    const userCred = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCred.user;
+
+    const snap = await getDoc(doc(db, "users", user.uid));
+
+    if (!snap.exists()) {
+      alert("User data missing");
+      return;
+    }
+
+    const role = snap.data().role?.toLowerCase().trim();
+
+    console.log("ROLE:", role);
+
+    if (role === "organizer") {
+      window.location.href = "organizer-dashboard.html";
+    } else if (role === "volunteer") {
+      window.location.href = "dashboard.html";
+    } else {
+      alert("Invalid role");
+    }
+
+  } catch (error) {
+    console.error(error);
+    alert(error.message);
+  }
+};
+</script>
+
+</body>
+</html>
